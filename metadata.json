@@ -1,0 +1,6 @@
+{
+  "name": "Prowl",
+  "description": "Engineered Precision for the elite athlete. Uncompromising industrial design and aerospace precision.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

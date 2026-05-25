@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Fira+Code:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bebas Neue", sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-mono: "Fira Code", monospace;
+
+  --color-gold: #c9a84c;
+  --color-gold-dim: #7a6330;
+  --color-gold-cream: #ffe08f;
+  --color-obsidian: #0a0a0a;
+  --color-slate: #1c1c1e;
+  --color-charcoal: #111111;
+  --color-surface: #121412;
+  --color-outline-variant: rgba(201, 168, 76, 0.15);
+  --color-muted: #6b6b70;
+}
+
+/* Global resets and aesthetics */
+* {
+  border-radius: 0px !important;
+}
+
+body {
+  background-color: #0a0a0a;
+  color: #f5f4f0;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar for premium touch */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #c9a84c;
+  border-radius: 0px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ffe08f;
+}
+
+/* Marquee continuous scroll */
+@keyframes continuous-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: continuous-marquee 25s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}

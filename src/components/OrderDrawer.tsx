@@ -269,7 +269,7 @@ STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#111111] border-l border-gold/20 shadow-2xl z-50 flex flex-col justify-between">
+    <div id="active-order-drawer" className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#111111] border-l border-gold/20 shadow-2xl z-50 flex flex-col justify-between">
       
       {/* Dynamic Print-Only Style Injection */}
       <style dangerouslySetInnerHTML={{__html: `
@@ -278,25 +278,44 @@ STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
             background: #ffffff !important;
             color: #000000 !important;
           }
-          body * {
-            visibility: hidden !important;
+          /* Hide all main app content blocks from print entirely to prevent scrolling spillover */
+          #navbar, nav, main, footer, #cursor-dot-prowl, #cursor-ring-prowl, .cursor-dot, .cursor-ring {
+            display: none !important;
           }
-          #printable-blueprint, #printable-blueprint * {
-            visibility: visible !important;
+          /* Hide other internal children of the active order drawer except the printable blueprint */
+          #active-order-drawer > *:not(#printable-blueprint) {
+            display: none !important;
           }
-          #printable-blueprint {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
+          /* Refit the active order drawer outer class for layout flow */
+          #active-order-drawer {
+            position: static !important;
+            display: block !important;
             width: 100% !important;
-            max-width: 800px !important;
-            margin: 0 auto !important;
+            max-width: 100% !important;
+            background: #ffffff !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          /* Ensure printable blueprint renders perfectly on a single page */
+          #printable-blueprint {
+            display: block !important;
+            visibility: visible !important;
+            position: relative !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 10px !important;
             background: #ffffff !important;
             color: #000000 !important;
             font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
             border: 2px solid #000000 !important;
-            padding: 24px !important;
-            display: block !important;
+          }
+          #printable-blueprint * {
+            visibility: visible !important;
+            color: #000000 !important;
+            background: transparent !important;
           }
         }
       `}} />

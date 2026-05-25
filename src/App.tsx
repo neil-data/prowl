@@ -970,10 +970,12 @@ export default function App() {
       {!isTouchDevice && (
         <>
           <div 
+            id="cursor-dot-prowl"
             ref={cursorDotRef}
             className="fixed top-0 left-0 pointer-events-none z-[9999] rounded-full bg-gold w-2.5 h-2.5 -translate-x-1/2 -translate-y-1/2 opacity-0"
           />
           <div 
+            id="cursor-ring-prowl"
             ref={cursorRingRef}
             className="fixed top-0 left-0 pointer-events-none z-[9998] rounded-full border border-gold/45 w-[26px] h-[26px] -translate-x-1/2 -translate-y-1/2 opacity-0 transition-[border-color,background-color] duration-300"
           />

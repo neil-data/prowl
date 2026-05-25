@@ -192,32 +192,32 @@ export default function ProductCatalog({ onAddProduct }: ProductCatalogProps) {
             <div className="card-shine-effect absolute inset-0 pointer-events-none z-10" />
 
             {/* Visual Header */}
-            <div className="aspect-[4/3] bg-obsidian relative overflow-hidden flex items-center justify-center">
+            <div className="aspect-[4/3] bg-[#0c0d0c] relative overflow-hidden flex items-center justify-center p-6 border-b border-outline-variant/30">
               <img
                 alt={piece.name}
-                className="w-full h-full object-cover opacity-60 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500 grayscale group-hover:grayscale-0"
+                className="max-h-[82%] max-w-[82%] object-contain opacity-70 group-hover:opacity-100 group-hover:scale-[1.03] transition-all duration-500 grayscale group-hover:grayscale-0 select-none"
                 src={piece.image}
               />
               <div className="absolute top-3 right-3 bg-obsidian/75 border border-outline-variant px-2 py-0.5 pointer-events-none">
                 <span className="font-mono text-[9px] text-muted">0{index + 1}</span>
               </div>
               
-              {/* Eye hovering overlay */}
-              <div className="absolute inset-0 bg-obsidian/45 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-3 transition-opacity duration-300 z-20">
+              {/* Eye hovering overlay - hidden on mobile, display on desktop hover */}
+              <div className="absolute inset-0 bg-obsidian/45 opacity-0 sm:group-hover:opacity-100 hidden sm:flex items-center justify-center gap-3 transition-opacity duration-300 z-20">
                 <button
                   onClick={() => {
                     setCustomColor('Raw Steel');
                     setCustomQty(1);
                     setActiveModalId(piece.id);
                   }}
-                  className="bg-gold text-background hover:bg-[#ffe08f] p-2.5 transition-all hover:scale-110 cursor-pointer"
+                  className="bg-gold text-black hover:bg-[#ffe08f] hover:shadow-[0_0_15px_rgba(201,168,76,0.22)] p-2.5 transition-all duration-300 hover:scale-105 cursor-pointer"
                   title="Verify Specifications"
                 >
                   <Eye className="w-5 h-5 stroke-[2.5]" />
                 </button>
                 <button
                   onClick={() => handleAddToCart(piece)}
-                  className="bg-background text-gold hover:bg-gold hover:text-background p-2.5 transition-all hover:scale-110 border border-gold cursor-pointer"
+                  className="bg-[#0f110f]/90 text-gold hover:bg-gold/[0.12] hover:border-gold hover:shadow-[0_0_12px_rgba(201,168,76,0.18)] p-2.5 transition-all duration-300 hover:scale-105 border border-gold/45 cursor-pointer"
                   title="Quick Add to Order"
                 >
                   <ShoppingBag className="w-5 h-5 stroke-[2.5]" />
@@ -226,19 +226,45 @@ export default function ProductCatalog({ onAddProduct }: ProductCatalogProps) {
             </div>
 
             {/* Product labels */}
-            <div className="p-5 border-t border-outline-variant bg-[#141513] flex justify-between items-end relative z-20">
-              <div>
-                <span className="font-label-caps text-[10px] text-muted tracking-widest block mb-1">
-                  {piece.category}
-                </span>
-                <h4 className="font-display text-2xl leading-none text-on-surface uppercase tracking-wide">
-                  {piece.name}
-                </h4>
+            <div className="p-5 border-t border-outline-variant bg-[#141513] flex flex-col gap-4 relative z-20">
+              <div className="flex justify-between items-end">
+                <div>
+                  <span className="font-label-caps text-[10px] text-muted tracking-widest block mb-1">
+                    {piece.category}
+                  </span>
+                  <h4 className="font-display text-2xl leading-none text-on-surface uppercase tracking-wide">
+                    {piece.name}
+                  </h4>
+                </div>
+                <div className="text-right">
+                  <span className="font-mono text-xs text-gold font-bold">
+                    ₹{piece.price.toLocaleString('en-IN')}
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="font-mono text-xs text-gold font-bold">
-                  ₹{piece.price.toLocaleString('en-IN')}
-                </span>
+
+              {/* Mobile-only action buttons */}
+              <div className="flex sm:hidden gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCustomColor('Raw Steel');
+                    setCustomQty(1);
+                    setActiveModalId(piece.id);
+                  }}
+                  className="flex-1 h-11 border border-gold/60 text-gold font-label-caps text-[11px] font-bold tracking-wider hover:bg-gold/10 active:bg-gold/20 flex items-center justify-center gap-1.5 cursor-pointer uppercase transition-all"
+                >
+                  <Eye className="w-3.5 h-3.5" /> Details
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToCart(piece);
+                  }}
+                  className="flex-1 h-11 bg-gold text-[#0a0a0a] font-label-caps text-[11px] font-bold tracking-wider hover:bg-[#ffe08f] active:bg-[#e0c06f] flex items-center justify-center gap-1.5 cursor-pointer uppercase transition-all"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" /> Buy Now
+                </button>
               </div>
             </div>
 
@@ -320,7 +346,7 @@ export default function ProductCatalog({ onAddProduct }: ProductCatalogProps) {
                   <span className="font-mono text-[10px] text-muted uppercase flex items-center gap-1">
                     <SwatchBook className="w-3.5 h-3.5 text-gold" /> Anodized Color Finish Accent
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {colors.map(col => (
                       <button
                         key={col}
@@ -328,7 +354,7 @@ export default function ProductCatalog({ onAddProduct }: ProductCatalogProps) {
                         className={`px-3 py-1 text-[11px] font-sans border transition-all cursor-pointer ${
                           customColor === col
                             ? 'border-gold bg-gold/10 text-gold'
-                            : 'border-outline-variant text-[#acacac] hover:border-gold/30'
+                             : 'border-outline-variant text-[#acacac] hover:border-gold/30'
                         }`}
                       >
                         {col}
@@ -339,7 +365,7 @@ export default function ProductCatalog({ onAddProduct }: ProductCatalogProps) {
               </div>
 
               {/* Actions toolbar */}
-              <div className="border-t border-[#1a1b1a] pt-5 flex items-center gap-4">
+              <div className="border-t border-[#1a1b1a] pt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                 {/* Qty count control */}
                 <div className="flex items-center border border-outline-variant h-11">
                   <button

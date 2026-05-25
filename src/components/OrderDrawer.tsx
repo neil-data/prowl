@@ -102,7 +102,7 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
 
             <button
               onClick={handleResetForm}
-              className="mt-4 px-6 h-10 border border-gold text-gold font-label-caps text-xs tracking-widest hover:bg-gold hover:text-background transition-colors cursor-pointer"
+              className="mt-4 px-6 h-10 border border-gold/45 hover:border-gold hover:shadow-[0_0_12px_rgba(201,168,76,0.18)] text-gold font-label-caps text-xs tracking-widest hover:bg-gold/[0.12] transition-all duration-300 ease-out cursor-pointer"
             >
               BUILD A NEW SPECIFICATION
             </button>

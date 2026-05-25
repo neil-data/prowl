@@ -48,11 +48,12 @@ export default function App() {
 
   // Header Dropdown Menu toggles
   const [showEquipmentMenu, setShowEquipmentMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Custom Cursor state
-  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
+  // Custom Cursor variables
   const [isTouchDevice, setIsTouchDevice] = useState(false);
+  const cursorDotRef = useRef<HTMLDivElement>(null);
+  const cursorRingRef = useRef<HTMLDivElement>(null);
 
   const mainRef = useRef<HTMLDivElement>(null);
 
@@ -266,8 +267,29 @@ export default function App() {
     setIsTouchDevice(isTouch);
     if (isTouch) return;
 
+    const cursorDot = cursorDotRef.current;
+    const cursorRing = cursorRingRef.current;
+    if (!cursorDot || !cursorRing) return;
+
+    // Initially position offscreen and hide
+    gsap.set([cursorDot, cursorRing], { xPercent: -50, yPercent: -50, opacity: 0 });
+
+    const xDotTo = gsap.quickTo(cursorDot, "x", { duration: 0.05, ease: "power3.out" });
+    const yDotTo = gsap.quickTo(cursorDot, "y", { duration: 0.05, ease: "power3.out" });
+    const xRingTo = gsap.quickTo(cursorRing, "x", { duration: 0.14, ease: "power2.out" });
+    const yRingTo = gsap.quickTo(cursorRing, "y", { duration: 0.14, ease: "power2.out" });
+
+    let hasMoved = false;
+
     const handleMouseMove = (e: MouseEvent) => {
-      setCursorPos({ x: e.clientX, y: e.clientY });
+      if (!hasMoved) {
+        gsap.to([cursorDot, cursorRing], { opacity: 1, duration: 0.25 });
+        hasMoved = true;
+      }
+      xDotTo(e.clientX);
+      yDotTo(e.clientY);
+      xRingTo(e.clientX);
+      yRingTo(e.clientY);
     };
 
     const handleMouseOver = (e: MouseEvent) => {
@@ -278,20 +300,61 @@ export default function App() {
         target.closest('a') || 
         target.closest('button') || 
         target.closest('.group') || 
-        target.classList.contains('cursor-pointer')
+        target.classList.contains('cursor-pointer') ||
+        target.closest('.cursor-pointer')
       ) {
-        setIsHovered(true);
+        gsap.to(cursorRing, {
+          width: '54px',
+          height: '54px',
+          borderColor: 'rgba(212, 175, 55, 0.9)',
+          backgroundColor: 'rgba(212, 175, 55, 0.12)',
+          duration: 0.25,
+          overwrite: "auto"
+        });
+        gsap.to(cursorDot, {
+          scale: 1.5,
+          backgroundColor: '#ffe08f',
+          duration: 0.25,
+          overwrite: "auto"
+        });
       } else {
-        setIsHovered(false);
+        gsap.to(cursorRing, {
+          width: '26px',
+          height: '26px',
+          borderColor: 'rgba(212, 175, 55, 0.45)',
+          backgroundColor: 'transparent',
+          duration: 0.3,
+          overwrite: "auto"
+        });
+        gsap.to(cursorDot, {
+          scale: 1,
+          backgroundColor: '#d4af37',
+          duration: 0.3,
+          overwrite: "auto"
+        });
+      }
+    };
+
+    const handleMouseLeave = () => {
+      gsap.to([cursorDot, cursorRing], { opacity: 0, duration: 0.2 });
+    };
+
+    const handleMouseEnter = () => {
+      if (hasMoved) {
+        gsap.to([cursorDot, cursorRing], { opacity: 1, duration: 0.2 });
       }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseover', handleMouseOver);
+    document.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mouseenter', handleMouseEnter);
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseover', handleMouseOver);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('mouseenter', handleMouseEnter);
     };
   }, []);
 
@@ -369,19 +432,30 @@ export default function App() {
   };
 
   return (
-    <div className="bg-obsidian text-on-surface min-h-screen font-sans flex flex-col relative">
+    <div className="bg-obsidian text-on-surface min-h-screen font-sans flex flex-col relative w-full overflow-x-hidden">
       
       {/* 1. Sticky Navigation Bar */}
       <nav 
-        className="bg-[#121412]/95 backdrop-blur-md fixed top-0 left-0 w-full z-40 border-b border-outline-variant flex justify-between items-center px-6 md:px-12 h-[64px] transition-all"
+        className="bg-[#121412]/95 backdrop-blur-md fixed top-0 left-0 w-full z-40 border-b border-outline-variant flex justify-between items-center px-4 sm:px-6 md:px-12 h-[64px] transition-all select-none"
         id="navbar"
       >
-        {/* Brand visual LOGO - Prowl */}
-        <div className="font-display text-[32px] text-gold tracking-widest uppercase cursor-pointer select-none" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-          PROWL
+        <div className="flex items-center gap-2">
+          {/* Mobile Menu Toggle Burger Button (Visible on phone/tablet, at least 44px touch space) */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden flex items-center justify-center w-11 h-11 text-muted hover:text-gold transition-colors cursor-pointer mr-1 z-50 rounded"
+            aria-label="Toggle Navigation Control Panel"
+          >
+            {isMobileMenuOpen ? <X className="w-6 h-6 text-gold" /> : <Menu className="w-6 h-6" />}
+          </button>
+
+          {/* Brand visual LOGO - Prowl */}
+          <div className="font-display text-2xl sm:text-3xl text-gold tracking-[0.2em] uppercase cursor-pointer select-none" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setIsMobileMenuOpen(false); }}>
+            PROWL
+          </div>
         </div>
 
-        {/* Center navigation links */}
+        {/* Center navigation links (Desktop only) */}
         <ul className="hidden md:flex items-center gap-6 h-full text-xs font-semibold tracking-widest uppercase">
           
           {/* Equipment Hover dropdown simulation */}
@@ -389,7 +463,7 @@ export default function App() {
             <button 
               onMouseEnter={() => setShowEquipmentMenu(true)}
               onClick={() => setShowEquipmentMenu(!showEquipmentMenu)}
-              className="hover:text-gold transition-colors flex items-center gap-1.5 cursor-pointer h-full px-2"
+              className="hover:text-gold transition-colors flex items-center gap-1.5 cursor-pointer h-[64px] px-2"
             >
               Equipment <ChevronDown className="w-3.5 h-3.5 mt-0.5 text-gold" />
             </button>
@@ -436,16 +510,16 @@ export default function App() {
           </li>
         </ul>
 
-        {/* Dynamic Cart count action buttons */}
-        <div className="flex items-center gap-4 h-full">
+        {/* Dynamic Cart count action buttons (at least 44px height targets) */}
+        <div className="flex items-center gap-2 sm:gap-4 h-full">
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="relative p-2 text-muted hover:text-gold transition-colors cursor-pointer"
+            className="relative w-11 h-11 flex items-center justify-center text-muted hover:text-gold transition-colors cursor-pointer rounded"
             aria-label="Active Hardware compiler"
           >
             <ShoppingCart className="w-5 h-5" />
             {orderList.length > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-gold text-[#0a0a0a] text-[9px] font-mono font-bold w-4 h-4 flex items-center justify-center border border-obsidian rounded-full animate-bounce">
+              <span className="absolute top-1 right-1 bg-gold text-[#0a0a0a] text-[9px] font-mono font-bold w-4 h-4 flex items-center justify-center border border-obsidian rounded-full">
                 {orderList.reduce((sum, item) => sum + item.qty, 0)}
               </span>
             )}
@@ -453,50 +527,97 @@ export default function App() {
 
           <button 
             onClick={() => setIsCartOpen(true)}
-            className="bg-gold text-[#0a0a0a] font-label-caps text-xs tracking-widest px-5 h-10 hover:bg-[#ffe08f] transition-all font-semibold uppercase cursor-pointer"
+            className="bg-gold text-[#0a0a0a] font-label-caps text-[11px] tracking-widest px-4 sm:px-6 h-11 hover:bg-[#ffe08f] transition-all font-bold uppercase cursor-pointer rounded-xs"
           >
             Shop Now
           </button>
         </div>
       </nav>
 
-      {/* Main Container spacing (top fixed offset) */}
-      <main ref={mainRef} className="flex-grow w-full max-w-7xl mx-auto overflow-hidden pt-[64px] px-6 lg:px-12 flex flex-col gap-16 pb-20">
+      {/* Slide down Dropdown Drawer for Mobile Navigation only */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden fixed top-[64px] left-0 w-full h-[calc(100vh-64px)] bg-[#0d0f0d] border-b border-outline-variant z-40 transition-transform duration-300 overflow-y-auto flex flex-col p-6 gap-6 select-none animate-fade-in">
+          <div>
+            <span className="text-gold font-display text-xs tracking-widest block mb-4 pb-1 border-b border-[#222]">STRENGTH CONFIGURATOR</span>
+            <div className="flex flex-col gap-3 font-mono text-[11px] uppercase text-[#acacac]">
+              <a href="#customizer" onClick={(e) => { handleAnchorClick(e, 'customizer'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold flex justify-between items-center bg-[#141614] px-3.5 border border-outline-variant/30">
+                <span>Phantom custom-rig designer</span>
+                <span className="text-gold">→</span>
+              </a>
+              <a href="#signature-pieces-view" onClick={(e) => { handleAnchorClick(e, 'signature-pieces-view'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold flex justify-between items-center bg-[#141614] px-3.5 border border-outline-variant/30">
+                <span>Signature Pieces</span>
+                <span>→</span>
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-gold font-display text-xs tracking-widest block mb-4 pb-1 border-b border-[#222]">BIOMECHANICAL LABS</span>
+            <div className="flex flex-col gap-3 font-mono text-[11px] uppercase text-[#acacac]">
+              <a href="#telemetry-spotlight" onClick={(e) => { handleAnchorClick(e, 'telemetry-spotlight'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold flex justify-between items-center bg-[#141614] px-3.5 border border-outline-variant/30">
+                <span>Prometheus Telemetry Feed</span>
+                <span className="text-gold animate-pulse">● LIVE</span>
+              </a>
+              <a href="#audio-spotlight" onClick={(e) => { handleAnchorClick(e, 'audio-spotlight'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold flex justify-between items-center bg-[#141614] px-3.5 border border-outline-variant/30">
+                <span>Prowl Audio Phase Calibrator</span>
+                <span className="text-gold font-mono">ANC</span>
+              </a>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-gold font-display text-xs tracking-widest block mb-4 pb-1 border-b border-[#222]">ELITE ARCHITECTURE</span>
+            <div className="flex flex-col gap-3 font-mono text-[11px] uppercase text-[#acacac]">
+              <a href="#scounter" onClick={(e) => { handleAnchorClick(e, 'scounter'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold">Calibrated Metrics</a>
+              <a href="#quotes" onClick={(e) => { handleAnchorClick(e, 'quotes'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold">Elite Directives</a>
+              <a href="#technical-registry" onClick={(e) => { handleAnchorClick(e, 'technical-registry'); setIsMobileMenuOpen(false); }} className="py-2 hover:text-gold">Technical Secured Registry SMS</a>
+            </div>
+          </div>
+
+          <div className="mt-auto border-t border-outline-variant/30 pt-6">
+            <span className="font-mono text-[8px] text-muted uppercase block mb-1">PROWL COMMAND CORE</span>
+            <span className="font-mono text-[9px] text-[#ffe08f] uppercase block">Encrypted Connection Status: Operational</span>
+          </div>
+        </div>
+      )}
+
+      {/* Main Container spacing (top fixed offset) - Expanded margins on mobile for 92-95vw, spacing system */}
+      <main ref={mainRef} className="flex-grow w-[min(100%,100vw)] max-w-[94vw] sm:max-w-6xl md:max-w-7xl mx-auto overflow-x-hidden pt-[64px] px-1 sm:px-6 lg:px-12 flex flex-col gap-12 md:gap-16 pb-28">
         
         {/* 2. Hero Section Grid */}
-        <section className="min-h-[600px] grid grid-cols-1 lg:grid-cols-12 gap-8 items-center py-10" id="customizer">
+        <section className="min-h-[550px] grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center py-6 md:py-12" id="customizer">
           {/* Hero Left Column: Brand Statement & CTA (5 cols) */}
-          <div className="lg:col-span-5 flex flex-col items-start text-left gap-6 pr-4">
-            <span className="hero-fade font-label-caps text-xs text-gold border border-gold px-3.5 py-1.5 tracking-widest inline-block select-none">
+          <div className="lg:col-span-12 xl:col-span-5 flex flex-col items-start text-left gap-5 sm:gap-6 lg:pr-4">
+            <span className="hero-fade font-label-caps text-[10px] sm:text-xs text-gold border border-gold px-3.5 py-1.5 tracking-widest inline-block select-none rounded-none">
               PREMIUM COLLECTION 2026
             </span>
             
-            <h1 className="flex flex-col leading-none mt-2 select-none">
-              <div className="overflow-hidden py-1">
-                <span className="hero-title-line font-display text-7xl md:text-8xl text-on-surface uppercase tracking-wide block">
+            <h1 className="flex flex-col leading-[0.95] mt-2 select-none">
+              <div className="overflow-hidden py-0.5">
+                <span className="hero-title-line font-display text-4xl sm:text-6xl md:text-7xl lg:text-[76px] xl:text-[90px] text-on-surface uppercase tracking-normal block leading-none">
                   BUILT FOR THE
                 </span>
               </div>
-              <div className="overflow-hidden h-14 my-[-6px]">
-                <span className="hero-title-line font-serif text-[42px] md:text-[56px] text-gold italic font-light pl-1 animate-pulse block">
+              <div className="overflow-hidden py-1">
+                <span className="hero-title-line font-serif text-3xl sm:text-5xl md:text-6xl lg:text-[54px] xl:text-[62px] text-gold italic font-light pl-1 animate-pulse block leading-none">
                   Perfect
                 </span>
               </div>
-              <div className="overflow-hidden py-1">
-                <span className="hero-title-line font-display text-7xl md:text-8xl text-on-surface uppercase tracking-wide block">
+              <div className="overflow-hidden py-0.5">
+                <span className="hero-title-line font-display text-4xl sm:text-6xl md:text-7xl lg:text-[76px] xl:text-[90px] text-on-surface uppercase tracking-normal block leading-none">
                   FORM
                 </span>
               </div>
             </h1>
 
-            <p className="hero-fade font-sans text-[#d0c5b2] text-sm md:text-base leading-relaxed max-w-lg mt-2">
+            <p className="hero-fade font-sans text-[#b8ae9c] text-xs sm:text-sm md:text-base leading-relaxed max-w-lg mt-1">
               Engineered with aerospace precision. The 2026 PROWL collection merges biomechanical mastery with uncompromising industrial design for high-performance elite athletes.
             </p>
 
-            <div className="hero-fade flex flex-wrap gap-4 mt-4 w-full sm:w-auto">
+            <div className="hero-fade flex flex-wrap gap-4 mt-2 w-full sm:w-auto">
               <button 
                 onClick={scrollToCatalog}
-                className="px-8 h-12 bg-gold text-[#0a0a0a] font-label-caps text-xs tracking-widest font-bold hover:bg-[#ffe08f] transition-all hover:scale-105 border border-gold cursor-pointer uppercase w-full sm:w-auto text-center"
+                className="px-8 h-12 bg-gold hover:bg-[#ffe08f] text-[#0a0a0a] font-label-caps text-xs tracking-widest font-bold transition-all hover:scale-101 border border-gold cursor-pointer uppercase w-full sm:w-auto text-center rounded-sm"
               >
                 EXPLORE COLLECTION
               </button>
@@ -504,7 +625,7 @@ export default function App() {
           </div>
 
           {/* Hero Right Column: Full-scale Power Rack Customizer (7 cols) */}
-          <div className="hero-right-panel lg:col-span-7 w-full shadow-2xl">
+          <div className="hero-right-panel lg:col-span-12 xl:col-span-7 w-full shadow-2xl">
             <RackCustomizer onAddToOrder={handleAddCustomConfig} />
           </div>
         </section>
@@ -617,10 +738,10 @@ export default function App() {
             <div className="aspect-[16/9] bg-obsidian relative overflow-hidden flex items-center justify-center">
               <img 
                 alt="Prometheus UI" 
-                className="w-full h-full object-cover opacity-50 group-hover:opacity-85 transition-opacity duration-500 rounded"
+                className="w-full h-full object-cover opacity-50 group-hover:opacity-20 transition-all duration-500 rounded transform group-hover:scale-[1.02]"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSTZhENYaJTSD-25LZ3KWY8FUNkSiEU0GENl2Q9Mgf7NrHi5Fphz6OPflxOy8x1YGUKTGsawpAlxw6EEwVghyP9HjxayZR3sNyvs7zxOxD0LkuSsysXTH8a9l9Q_HxWodVEsOHF7fpDhVr1GlzGX4sDfRm2T23qsNGv2c7N33ux8o7xz9TzkKFyojCZGYkSPyW40h1b3QhISE0g3JHWoQSJ86MEweLDc2H3G9rH-jjvVOWNYjC57ad7Ru9mUbulx_6O-PtFVq7dAEk"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-obsidian via-transparent to-transparent opacity-80" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#111111] via-black/40 to-black/70 opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
               <div className="absolute bottom-4 left-4 flex flex-col gap-1 text-left">
                 <span className="font-mono text-[9px] text-gold uppercase tracking-widest font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" /> TECHNOLOGY SPECIFICATION 
@@ -637,7 +758,7 @@ export default function App() {
               <div className="flex flex-col gap-4">
                 <button
                   onClick={() => setShowTelemetrySim(!showTelemetrySim)}
-                  className="w-full h-11 bg-transparent hover:bg-gold hover:text-background border border-gold font-label-caps text-xs tracking-widest font-bold text-gold transition-all flex items-center justify-center gap-2 cursor-pointer uppercase"
+                  className="w-full h-11 bg-[#151715]/40 hover:bg-gold/[0.08] hover:border-gold hover:shadow-[0_0_15px_rgba(201,168,76,0.15)] border border-gold/45 font-label-caps text-xs tracking-widest font-bold text-gold transition-all duration-300 ease-out flex items-center justify-center gap-2 cursor-pointer uppercase min-h-[44px]"
                 >
                   <RotateCcw className="w-4 h-4 mt-0.5" />
                   {showTelemetrySim ? 'Collapse Telemetry Grid Feed' : 'DISCOVER TECH (Simulate Live Feeds)'}
@@ -660,10 +781,10 @@ export default function App() {
             <div className="aspect-[16/9] bg-obsidian relative overflow-hidden flex items-center justify-center">
               <img 
                 alt="Prowl Audio" 
-                className="w-full h-full object-cover opacity-50 group-hover:opacity-85 transition-opacity duration-500 rounded"
+                className="w-full h-full object-cover opacity-50 group-hover:opacity-20 transition-all duration-500 rounded transform group-hover:scale-[1.02]"
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDLAjqyZkaqTPr8QQVOshZBovOyE3H7bXG7pIREAPrCbRcrCAl0mY4zIs6sgYjdeLLW0McH74ewBpSJ4OGpoFPL6Phw1uVuJtU2jYC2Wf9crnBkQS8oVqZ7J5tOpTaskvEhQIkPY00-0JYLT5vQV9aegblDXZ3v5dIqYnkPzGuagRsRt7ElIOPa6UBUzp-mJW-C1YKyHt8Hc20V1GXHqTW4c-G7gHvmlttA6hdhHfnLOHjQctQLupnXlPa6RFeXW8g48SgMy3tAopQ"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-obsidian via-transparent to-transparent opacity-80" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#111111] via-black/40 to-black/70 opacity-90 transition-opacity duration-300 group-hover:opacity-100" />
               <div className="absolute bottom-4 left-4 flex flex-col gap-1 text-left">
                 <span className="font-mono text-[9px] text-gold uppercase tracking-widest font-semibold flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-gold" /> AUDIOPHILE DISCIPLINE
@@ -680,7 +801,7 @@ export default function App() {
               <div className="flex flex-col gap-4">
                 <button
                   onClick={() => setShowAudioSim(!showAudioSim)}
-                  className="w-full h-11 bg-transparent hover:bg-gold hover:text-background border border-gold font-label-caps text-xs tracking-widest font-bold text-gold transition-all flex items-center justify-center gap-2 cursor-pointer uppercase"
+                  className="w-full h-11 bg-[#151715]/40 hover:bg-gold/[0.08] hover:border-gold hover:shadow-[0_0_15px_rgba(201,168,76,0.15)] border border-gold/45 font-label-caps text-xs tracking-widest font-bold text-gold transition-all duration-300 ease-out flex items-center justify-center gap-2 cursor-pointer uppercase min-h-[44px]"
                 >
                   <RotateCcw className="w-4 h-4 mt-0.5" />
                   {showAudioSim ? 'Inhibit Phase Suppress Simulation' : 'PRE-ORDER (Verify Phase Cancellation)'}
@@ -849,22 +970,12 @@ export default function App() {
       {!isTouchDevice && (
         <>
           <div 
-            className="fixed pointer-events-none z-50 rounded-full bg-gold transition-all duration-75 -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${cursorPos.x}px`,
-              top: `${cursorPos.y}px`,
-              width: isHovered ? '10px' : '6px',
-              height: isHovered ? '10px' : '6px',
-            }}
+            ref={cursorDotRef}
+            className="fixed top-0 left-0 pointer-events-none z-[9999] rounded-full bg-gold w-2.5 h-2.5 -translate-x-1/2 -translate-y-1/2 opacity-0"
           />
           <div 
-            className="fixed pointer-events-none z-50 rounded-full border border-gold/40 transition-all duration-300 -translate-x-1/2 -translate-y-1/2"
-            style={{
-              left: `${cursorPos.x}px`,
-              top: `${cursorPos.y}px`,
-              width: isHovered ? '42px' : '26px',
-              height: isHovered ? '42px' : '26px',
-            }}
+            ref={cursorRingRef}
+            className="fixed top-0 left-0 pointer-events-none z-[9998] rounded-full border border-gold/45 w-[26px] h-[26px] -translate-x-1/2 -translate-y-1/2 opacity-0 transition-[border-color,background-color] duration-300"
           />
         </>
       )}

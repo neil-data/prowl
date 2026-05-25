@@ -21,6 +21,7 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
   const [isDownloadingSpec, setIsDownloadingSpec] = useState<boolean>(false);
   const [showToast, setShowToast] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string>('LINK COPIED TO COMMS');
   const [copiedLink, setCopiedLink] = useState<string>('');
   const [isCheckoutCompleted, setIsCheckoutCompleted] = useState<boolean>(false);
 
@@ -176,9 +177,71 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
 
   const triggerNativePrint = () => {
     try {
-      window.print();
+      const printEl = document.getElementById('printable-blueprint');
+      if (!printEl) {
+        window.print();
+        return;
+      }
+      
+      // Create an isolated dynamic print iframe to guarantee single-page rendering and completely prevent empty page spillovers
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = '0';
+      document.body.appendChild(iframe);
+      
+      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (iframeDoc) {
+        iframeDoc.open();
+        iframeDoc.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Prowl Order Specification Blueprint</title>
+              <style>
+                @page {
+                  size: portrait;
+                  margin: 12mm 15mm;
+                }
+                html, body {
+                  margin: 0;
+                  padding: 0;
+                  background: #ffffff !important;
+                  color: #000000 !important;
+                  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+                  -webkit-print-color-adjust: exact;
+                  print-color-adjust: exact;
+                }
+                body {
+                  padding: 10px;
+                }
+              </style>
+            </head>
+            <body>
+              ${printEl.innerHTML}
+            </body>
+          </html>
+        `);
+        iframeDoc.close();
+        
+        // Wait minor delay, focus, and trigger print dialog
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          // Cleanup iframe immediately after the print spool starts
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1500);
+        }, 500);
+      } else {
+        window.print();
+      }
     } catch (e) {
-      console.error('Print trigger failed', e);
+      console.error('Print trigger failed, fallback to native window.print()', e);
+      window.print();
     }
   };
 
@@ -192,6 +255,7 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
     textArea.select();
     try {
       document.execCommand('copy');
+      setToastMessage('SPECIFICATION COPIED TO CLIPBOARD');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 2800);
     } catch (err) {
@@ -203,6 +267,7 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
   const handleShareConfig = () => {
     const url = window.location.href;
     setCopiedLink(url);
+    setToastMessage('LINK COPIED TO COMMS');
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url)
@@ -254,16 +319,78 @@ LOGISTICAL FINANCIAL OUTLINE:
 ========================================================================
 STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
 ========================================================================
-      `;
-      const blob = new Blob([textConfig.trim()], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Prowl_SpecBlueprint_${quoteNumber || 'Draft'}.txt`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 1200);
+`;
+
+      let downloaded = false;
+
+      // 1. Core Blob Trigger for laptop downloads
+      try {
+        const blob = new Blob([textConfig.trim()], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Prowl_SpecBlueprint_${quoteNumber || 'Draft'}.txt`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 100);
+        downloaded = true;
+      } catch (err) {
+        console.error('Blob download failed, fallback to data URI text', err);
+      }
+
+      // 2. Fallback Data URI Trigger for mobile browser systems (iOS Safari etc) that block sandboxed block blobs
+      if (!downloaded) {
+        try {
+          const encodedText = encodeURIComponent(textConfig.trim());
+          const link = document.createElement('a');
+          link.href = 'data:text/plain;charset=utf-8,' + encodedText;
+          link.setAttribute('download', `Prowl_SpecBlueprint_${quoteNumber || 'Draft'}.txt`);
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          downloaded = true;
+        } catch (e) {
+          console.error('Data-URI backup failed', e);
+        }
+      }
+
+      // 3. Absolute Clipboard copy safety net so mobile users can always paste instantly!
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(textConfig.trim())
+            .then(() => {
+              setToastMessage('DOWNLOADED & SPECS COPIED!');
+              setShowToast(true);
+              setTimeout(() => setShowToast(false), 3200);
+            })
+            .catch(() => {
+              const textArea = document.createElement("textarea");
+              textArea.value = textConfig.trim();
+              textArea.style.position = "fixed";
+              textArea.style.left = "-9999px";
+              document.body.appendChild(textArea);
+              textArea.focus();
+              textArea.select();
+              document.execCommand('copy');
+              document.body.removeChild(textArea);
+              setToastMessage('DOWNLOADED & SPECS COPIED!');
+              setShowToast(true);
+              setTimeout(() => setShowToast(false), 3200);
+            });
+        } else {
+          setToastMessage('SPEC SHEET COMPILED OK');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3200);
+        }
+      } catch (clipErr) {
+        console.error('Clipboard injection error', clipErr);
+        setToastMessage('SPEC SHEET COMPILED OK');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3200);
+      }
+
+    }, 800);
   };
 
   if (!isOpen) return null;
@@ -324,7 +451,7 @@ STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
       {showToast && (
         <div className="fixed top-6 left-1/2 transform -translate-x-1/2 bg-[#121212] border border-gold px-6 py-3 shadow-[0_0_24px_rgba(201,168,76,0.3)] z-[2000] flex items-center gap-3 transition-opacity duration-300">
           <div className="w-2 h-2 bg-gold animate-ping rounded-full" />
-          <span className="font-mono text-xs text-gold uppercase tracking-[0.15em] font-medium">LINK COPIED TO COMMS</span>
+          <span className="font-mono text-xs text-gold uppercase tracking-[0.15em] font-medium">{toastMessage}</span>
         </div>
       )}
 

@@ -1,7 +1,120 @@
 import { useState, useMemo, FormEvent, useEffect, useRef } from 'react';
-import { X, Trash2, Send, Info, ShoppingCart, CheckCircle, FileSpreadsheet, ShieldCheck, Printer, FileText, Share2, Check } from 'lucide-react';
+import { 
+  X, Trash2, Send, Info, ShoppingCart, CheckCircle, 
+  FileSpreadsheet, ShieldCheck, Printer, FileText, Share2, Check,
+  Truck, Settings, MapPin, Activity, ChevronRight, Search, 
+  Database, RefreshCw, Play, Flame, Ruler, Clock
+} from 'lucide-react';
 import { OrderItem } from '../types';
 import { gsap } from 'gsap';
+
+// Real-time Tactical Radar Tracking Subcomponent
+const CanvasRadarMap = ({ progress, status }: { progress: number; status: string }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    let scanLineAngle = 0;
+
+    const render = () => {
+      // Clear with soft glow black
+      ctx.fillStyle = '#111111';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const maxRadius = Math.min(cx, cy) - 8;
+
+      // Draw grid sweeps
+      ctx.strokeStyle = 'rgba(201, 168, 76, 0.08)';
+      ctx.lineWidth = 1;
+      for (let r = 15; r <= maxRadius; r += 20) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(8, cy);
+      ctx.lineTo(canvas.width - 8, cy);
+      ctx.moveTo(cx, 8);
+      ctx.lineTo(cx, canvas.height - 8);
+      ctx.stroke();
+
+      // Rotating sweep line
+      ctx.strokeStyle = 'rgba(201, 168, 76, 0.2)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(scanLineAngle) * maxRadius, cy + Math.sin(scanLineAngle) * maxRadius);
+      ctx.stroke();
+
+      // Route setup
+      ctx.strokeStyle = 'rgba(201, 168, 76, 0.12)';
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(30, 40);
+      ctx.lineTo(90, 60);
+      ctx.lineTo(canvas.width - 40, canvas.height - 30);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Nodes
+      ctx.fillStyle = '#6b6b70';
+      ctx.beginPath(); ctx.arc(30, 40, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '7px monospace';
+      ctx.fillText('BOM HQ', 20, 32);
+
+      ctx.beginPath(); ctx.arc(90, 60, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillText('PNE HUB', 95, 62);
+
+      ctx.fillStyle = '#c9a84c';
+      ctx.beginPath(); ctx.arc(canvas.width - 40, canvas.height - 30, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillText('CLIENT', canvas.width - 70, canvas.height - 18);
+
+      let tx = 30;
+      let ty = 40;
+      if (status === 'CAD_VERIFIED' || status === 'FABRICATION') {
+        tx = 90; ty = 60;
+      } else if (status === 'TRANSIT') {
+        const prg = progress / 100;
+        tx = 90 + (canvas.width - 40 - 90) * prg;
+        ty = 60 + (canvas.height - 30 - 60) * prg;
+      } else if (status === 'INSTALLED') {
+        tx = canvas.width - 40;
+        ty = canvas.height - 30;
+      }
+
+      ctx.fillStyle = 'rgba(201, 168, 76, 0.35)';
+      ctx.beginPath(); ctx.arc(tx, ty, 6 + Math.sin(Date.now() * 0.01) * 2, 0, Math.PI * 2); ctx.fill();
+
+      ctx.fillStyle = '#c9a84c';
+      ctx.beginPath(); ctx.arc(tx, ty, 4, 0, Math.PI * 2); ctx.fill();
+
+      scanLineAngle += 0.012;
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+    return () => cancelAnimationFrame(animId);
+  }, [progress, status]);
+
+  return (
+    <div className="relative border border-[#c9a84c]/15 bg-[#0a0a0a] h-[130px] w-full flex items-center justify-center p-1 rounded overflow-hidden">
+      <div className="absolute top-1.5 left-2 flex items-center gap-1 font-mono text-[7px] text-gold/75 px-1 py-0.5 bg-[#111] border border-gold/15">
+        <div className="w-1.5 h-1.5 bg-gold animate-ping rounded-full" />
+        <span>RADAR PATH DISPATCH ACTIVE</span>
+      </div>
+      <canvas ref={canvasRef} width={340} height={110} className="w-full h-full object-contain" />
+    </div>
+  );
+};
 
 interface OrderDrawerProps {
   isOpen: boolean;
@@ -16,6 +129,13 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
   const [clientEmail, setClientEmail] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
+
+  // Real-time tracking system variables
+  const [activeOrderTrackData, setActiveOrderTrackData] = useState<any>(null);
+  const [ordersHistory, setOrdersHistory] = useState<string[]>([]);
+  const [trackingSearchId, setTrackingSearchId] = useState<string>('');
+  const [trackingSearchError, setTrackingSearchError] = useState<string | null>(null);
+  const [isSimulatingState, setIsSimulatingState] = useState<boolean>(false);
   
   // Custom specification states (Bench custom design defaults)
   const [showConfigModal, setShowConfigModal] = useState<boolean>(false);
@@ -31,6 +151,66 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
   const [selectedAddons, setSelectedAddons] = useState<string[]>(['safety-spotter']);
 
   // Base configurations and prices
+  useEffect(() => {
+    try {
+      const past = JSON.parse(localStorage.getItem("prowl_orders_history") || "[]");
+      setOrdersHistory(past);
+    } catch (_) {}
+  }, [isCheckoutCompleted]);
+
+  useEffect(() => {
+    if (!isCheckoutCompleted || !quoteNumber) {
+      setActiveOrderTrackData(null);
+      return;
+    }
+
+    let eventSource: EventSource | null = null;
+    let pollInterval: any = null;
+
+    const fetchOrderData = async () => {
+      try {
+        const r = await fetch(`/api/orders/${quoteNumber}`);
+        if (r.ok) {
+          const data = await r.json();
+          setActiveOrderTrackData(data);
+        }
+      } catch (e) {
+        console.error("Backup polling fetch failed", e);
+      }
+    };
+
+    const startPolling = () => {
+      fetchOrderData();
+      pollInterval = setInterval(fetchOrderData, 3000);
+    };
+
+    try {
+      eventSource = new EventSource(`/api/orders/${quoteNumber}/live`);
+      eventSource.onmessage = (event) => {
+        try {
+          const updatedOrder = JSON.parse(event.data);
+          setActiveOrderTrackData(updatedOrder);
+        } catch (e) {
+          console.error("SSE parse error", e);
+        }
+      };
+      eventSource.onerror = (err) => {
+        console.warn("SSE stream failed/closed, launching backup polling...", err);
+        if (eventSource) {
+          eventSource.close();
+        }
+        startPolling();
+      };
+    } catch (_) {
+      startPolling();
+    }
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [isCheckoutCompleted, quoteNumber]);
+
   const FINISH_DETAILS: Record<string, { name: string; price: number }> = {
     'raw-steel': { name: 'Raw Steel', price: 0 },
     'matte-black': { name: 'Matte Black', price: 200 },
@@ -157,16 +337,54 @@ export default function OrderDrawer({ isOpen, onClose, orderList, onRemoveItem, 
     gsap.fromTo('.prowl-config-card', { opacity: 0.8, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', stagger: 0.05 });
   };
 
-  const handleQuoteRequestSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleQuoteRequestSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!clientEmail) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
+    try {
+      const payload = {
+        email: clientEmail,
+        items: orderList,
+        config: {
+          finish: selectedFinish,
+          upholstery: selectedUpholstery,
+          addons: selectedAddons,
+          whiteGloveService: whiteGloveService,
+        },
+        pricing: calculatedTotal,
+      };
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setQuoteNumber(data.order.id);
+        setActiveOrderTrackData(data.order);
+        
+        // Cache in browser local past order specs histories
+        try {
+          const past = JSON.parse(localStorage.getItem("prowl_orders_history") || "[]");
+          if (!past.includes(data.order.id)) {
+            past.push(data.order.id);
+            localStorage.setItem("prowl_orders_history", JSON.stringify(past));
+          }
+        } catch (_) {}
+      } else {
+        const generatedCode = `PRW-${Math.round(2026 + Math.random() * 4)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        setQuoteNumber(generatedCode);
+      }
+    } catch (err) {
+      console.error("API error during quote registration:", err);
       const generatedCode = `PRW-${Math.round(2026 + Math.random() * 4)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
       setQuoteNumber(generatedCode);
+    } finally {
       setIsSubmitting(false);
-    }, 2000);
+    }
   };
 
   const handleResetForm = () => {
@@ -519,15 +737,98 @@ STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
             </button>
           </div>
         ) : orderList.length === 0 ? (
-          /* Cart Empty trigger */
-          <div className="flex flex-col items-center justify-center py-20 text-center gap-4 h-full">
-            <ShoppingCart className="w-12 h-12 text-[#4d4637] stroke-[1]" />
-            <div>
-              <h4 className="font-display text-2xl text-on-surface uppercase">COMPILER STREAM SILENT</h4>
-              <p className="font-sans text-xs text-muted max-w-xs mt-1">
-                Explore our signature strength pieces or customize your Phantom Power Rack to append items here.
-              </p>
+          /* Cart Empty trigger with Tracker capabilities */
+          <div className="flex flex-col items-center justify-center py-10 text-center gap-6 h-full">
+            <div className="flex flex-col items-center gap-3">
+              <ShoppingCart className="w-12 h-12 text-[#4d4637] stroke-[1]" />
+              <div>
+                <h4 className="font-display text-2xl text-on-surface uppercase">COMPILER STREAM SILENT</h4>
+                <p className="font-sans text-xs text-muted max-w-xs mt-1">
+                  Explore our signature strength pieces or customize your Phantom Power Rack to append items here.
+                </p>
+              </div>
             </div>
+
+            <div className="w-full max-w-sm border-t border-[#222] my-2" />
+
+            {/* Live positioning lookup panel */}
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!trackingSearchId.trim()) return;
+                setTrackingSearchError(null);
+                try {
+                  const r = await fetch(`/api/orders/${trackingSearchId.trim().toUpperCase()}`);
+                  if (r.ok) {
+                    const data = await r.json();
+                    setActiveOrderTrackData(data);
+                    setQuoteNumber(data.id);
+                    setIsCheckoutCompleted(true);
+                  } else {
+                    setTrackingSearchError("SPEC ID NOT RECOGNIZED IN ARCHIVE");
+                  }
+                } catch (_) {
+                  setTrackingSearchError("TRANSMISSION NETWORK ERROR");
+                }
+              }}
+              className="w-full max-w-sm p-4 border border-outline-variant bg-[#141513] rounded flex flex-col gap-3"
+            >
+              <div className="flex items-center gap-2 text-[#ffe08f]">
+                <Truck className="w-4 h-4 text-gold" />
+                <span className="font-mono text-[10px] uppercase font-bold tracking-widest text-[#ffe08f]">
+                  LIVE LOGISTICS SAT-MAP TRACER
+                </span>
+              </div>
+              
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={trackingSearchId}
+                  onChange={(e) => setTrackingSearchId(e.target.value)}
+                  placeholder="ENTER SECURED SPEC CODE" 
+                  className="flex-1 h-9 bg-black border border-outline-variant font-mono text-[10px] uppercase px-3 text-white focus:outline-none focus:border-gold placeholder:text-muted/60 tracking-wider"
+                />
+                <button 
+                  type="submit"
+                  className="h-9 px-4 bg-gold hover:bg-[#ffe08f] text-black font-mono text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  TRACE
+                </button>
+              </div>
+              {trackingSearchError && (
+                <p className="font-mono text-[8px] text-red-500 text-left mt-0.5">• {trackingSearchError}</p>
+              )}
+            </form>
+
+            {ordersHistory.length > 0 && (
+              <div className="w-full max-w-sm flex flex-col gap-2 text-left">
+                <span className="font-mono text-[8px] text-muted uppercase tracking-widest">
+                  [ RECENT REGISTERED CONTRACTS ]
+                </span>
+                <div className="flex flex-col gap-1.5 max-h-[110px] overflow-y-auto pr-1">
+                  {ordersHistory.map((id) => (
+                    <button
+                      key={id}
+                      onClick={async () => {
+                        try {
+                          const r = await fetch(`/api/orders/${id}`);
+                          if (r.ok) {
+                            const data = await r.json();
+                            setActiveOrderTrackData(data);
+                            setQuoteNumber(id);
+                            setIsCheckoutCompleted(true);
+                          }
+                        } catch (_) {}
+                      }}
+                      className="w-full p-2 bg-[#0d0e0d] border border-[#222] hover:border-gold/40 text-left flex justify-between items-center transition-all cursor-pointer rounded"
+                    >
+                      <span className="font-mono text-[9px] text-[#acacac]">{id}</span>
+                      <ChevronRight className="w-3 h-3 text-gold/60" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Active item list */
@@ -901,12 +1202,63 @@ STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
                   </button>
 
                   <button
-                    onClick={() => {
-                      setIsCheckoutCompleted(true);
+                    onClick={async () => {
+                      if (!clientEmail) {
+                        setToastMessage('ENTER EMAIL IN GUEST PANEL FIRST');
+                        setShowToast(true);
+                        setTimeout(() => setShowToast(false), 3000);
+                        return;
+                      }
+                      
+                      setIsSubmitting(true);
+                      try {
+                        const payload = {
+                          email: clientEmail,
+                          items: orderList,
+                          config: {
+                            finish: selectedFinish,
+                            upholstery: selectedUpholstery,
+                            addons: selectedAddons,
+                            whiteGloveService: whiteGloveService,
+                          },
+                          pricing: calculatedTotal,
+                        };
+
+                        const res = await fetch("/api/orders", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(payload),
+                        });
+
+                        if (res.ok) {
+                          const data = await res.json();
+                          setQuoteNumber(data.order.id);
+                          setActiveOrderTrackData(data.order);
+                          setIsCheckoutCompleted(true);
+                          
+                          // Cache in browser local past order specs histories
+                          try {
+                            const past = JSON.parse(localStorage.getItem("prowl_orders_history") || "[]");
+                            if (!past.includes(data.order.id)) {
+                              past.push(data.order.id);
+                              localStorage.setItem("prowl_orders_history", JSON.stringify(past));
+                            }
+                          } catch (_) {}
+                        } else {
+                          // Local offline fallback
+                          setIsCheckoutCompleted(true);
+                        }
+                      } catch (err) {
+                        console.error("Checkout process API error:", err);
+                        setIsCheckoutCompleted(true);
+                      } finally {
+                        setIsSubmitting(false);
+                      }
                     }}
-                    className="h-12 bg-gold hover:bg-[#ffe08f] text-black font-display text-xl tracking-[0.05em] font-medium transition-all duration-300 flex items-center justify-center cursor-pointer shadow-[0_0_24px_rgba(201,168,76,0.15)] transform active:scale-98 sm:col-span-1"
+                    disabled={isSubmitting}
+                    className="h-12 bg-gold hover:bg-[#ffe08f] text-black font-display text-xl tracking-[0.05em] font-medium transition-all duration-300 flex items-center justify-center cursor-pointer shadow-[0_0_24px_rgba(201,168,76,0.15)] transform active:scale-98 sm:col-span-1 disabled:opacity-50"
                   >
-                    CONFIRM & CHECKOUT
+                    {isSubmitting ? "PROCESSING..." : "CONFIRM & CHECKOUT"}
                   </button>
 
                   {copiedLink && (
@@ -1249,34 +1601,268 @@ STATUS: APPROVED FOR DIRECT PROCUREMENT -- VALID UNDER SIGN-OFF SEAL
 
       {/* Checkout Success Confirmation Modal Overlay */}
       {isCheckoutCompleted && (
-        <div className="fixed inset-0 bg-[#0a0a0a]/95 z-[2000] flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-[#121212] border border-gold p-8 flex flex-col items-center text-center gap-6 shadow-[0_0_50px_rgba(201,168,76,0.25)] rounded-xs">
-            <div className="w-16 h-16 bg-gold/10 border border-gold flex items-center justify-center rounded-full">
-              <Check className="w-8 h-8 text-gold stroke-[3]" />
+        <div className="fixed inset-0 bg-[#070707]/98 z-[2000] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+          <div className="w-full max-w-4xl bg-[#111111] border border-gold/30 p-5 sm:p-8 flex flex-col gap-6 shadow-[0_0_60px_rgba(201,168,76,0.3)] rounded text-left">
+            
+            {/* Header section with telemetry bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#222] pb-4 gap-3">
+              <div>
+                <span className="font-mono text-[9px] text-muted tracking-widest block uppercase">
+                  PROWL INDUSTRIAL LOGISTICS INTERACTIVE TERMINAL
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <Activity className="w-5 h-5 text-gold animate-pulse" />
+                  <h3 className="font-display text-2xl text-white uppercase tracking-wider">
+                    Dispatch Transmission: <span className="text-gold selection:bg-gold/30">{quoteNumber}</span>
+                  </h3>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <div className="px-2.5 py-1 bg-[#1a150e] border border-gold/15 flex items-center gap-1.5 rounded">
+                  <div className="w-2 h-2 bg-gold animate-ping rounded-full" />
+                  <span className="font-mono text-[9px] text-gold uppercase tracking-wider font-semibold">
+                    {activeOrderTrackData ? `FEED: ${activeOrderTrackData.status}` : "CONNECTING..."}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <h3 className="font-display text-3xl text-white uppercase tracking-wide mb-2">Checkout Confirmed</h3>
-              <p className="font-sans text-xs text-silver leading-relaxed">
-                Your Prowl Elite checkout session has been secure locked. Our structural engineering team will contact you shortly via <strong className="text-gold">{clientEmail || "your email"}</strong> to review CAD layouts, dimensions, and arrange concrete floor anchoring.
-              </p>
+
+            {/* Main Content Layout Split-Pane */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              
+              {/* LEFT COLUMN: Pipelines & Sat Radar Map */}
+              <div className="md:col-span-7 flex flex-col gap-5">
+                
+                {/* AMAZON PIPELINE WORKFLOW PROGRESS BAR */}
+                <div className="bg-[#0a0a0a] border border-[#222] p-4 rounded relative select-none">
+                  <span className="font-mono text-[8px] text-muted uppercase tracking-widest block mb-4">
+                    [ DISPATCH PIPELINE LOGISTICS ]
+                  </span>
+                  
+                  <div className="relative flex justify-between items-center z-10">
+                    {/* Connecting background progress-axis line */}
+                    <div className="absolute top-4 left-4 right-4 h-[2px] bg-[#222] -z-10">
+                      <div 
+                        className="h-full bg-gold transition-all duration-500" 
+                        style={{
+                          width: `${
+                            activeOrderTrackData?.status === "ORDERED" ? '0%' :
+                            activeOrderTrackData?.status === "CAD_VERIFIED" ? '25%' :
+                            activeOrderTrackData?.status === "FABRICATION" ? '50%' :
+                            activeOrderTrackData?.status === "TRANSIT" ? `${50 + (activeOrderTrackData?.transitProgress || 0) * 0.25}%` :
+                            '100%'
+                          }`
+                        }}
+                      />
+                    </div>
+
+                    {/* Step Nodes */}
+                    {[
+                      { st: 'ORDERED', label: 'Ordered', icon: ShoppingCart },
+                      { st: 'CAD_VERIFIED', label: 'CAD Check', icon: FileText },
+                      { st: 'FABRICATION', label: 'Fabricate', icon: Flame },
+                      { st: 'TRANSIT', label: 'Transit', icon: Truck },
+                      { st: 'INSTALLED', label: 'Deployed', icon: Check }
+                    ].map((step, idx) => {
+                      const stages = ['ORDERED', 'CAD_VERIFIED', 'FABRICATION', 'TRANSIT', 'INSTALLED'];
+                      const activeIndex = stages.indexOf(activeOrderTrackData?.status || 'ORDERED');
+                      const currentStepIndex = stages.indexOf(step.st);
+                      const isCompleted = currentStepIndex < activeIndex;
+                      const isActive = currentStepIndex === activeIndex;
+                      const Icon = step.icon;
+
+                      return (
+                        <div key={idx} className="flex flex-col items-center">
+                          <div 
+                            className={`w-9 h-9 rounded-full flex items-center justify-center border transition-all duration-300 ${
+                              isCompleted ? 'bg-gold border-gold text-black shadow-[0_0_12px_rgba(201,168,76,0.3)]' :
+                              isActive ? 'bg-[#1c150c] border-gold text-gold shadow-[0_0_15px_rgba(201,168,76,0.5)] animate-pulse' :
+                              'bg-black border-[#2d2d30] text-[#555]'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <span className={`font-mono text-[9px] uppercase tracking-wider mt-1.5 ${
+                            isActive ? 'text-gold font-bold' :
+                            isCompleted ? 'text-white' : 'text-[#555]'
+                          }`}>
+                            {step.label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Tact Radar visualization */}
+                <CanvasRadarMap 
+                  progress={activeOrderTrackData?.transitProgress || 0} 
+                  status={activeOrderTrackData?.status || 'ORDERED'} 
+                />
+
+                {/* Tactical Terminal scrolling live logs */}
+                <div className="bg-[#080808] border border-[#222] p-3.5 font-mono text-[9px] text-[#8e9a8d] h-[115px] overflow-y-auto flex flex-col gap-1 rounded select-none">
+                  <span className="text-[#ffe08f] font-bold border-b border-[#222] pb-1 block mb-1 uppercase tracking-widest text-[8px]">
+                    SYSTEM LOGS // REAL-TIME DISPATCH MONITOR
+                  </span>
+                  {[
+                    "[INFO] SECURITY SESSION ESTABLISHED ON PORT 3000",
+                    `[INFO] ORDER INTAKE COMMITTED SECURELY: EST_REV: 2.05-B`,
+                    ...(activeOrderTrackData?.status === 'CAD_VERIFIED' ? [
+                      "[OK] STRESS MODULUS RE-CALIBRATED AT 3.2X TOLERANCE",
+                      "[SYS] CAD SCHEMATIC LOCKED AND VERIFIED BY LEAD ENGINEER"
+                    ] : activeOrderTrackData?.status === 'FABRICATION' ? [
+                      "[OK] CAD SCHEMATIC LOCKED AND VERIFIED BY LEAD ENGINEER",
+                      "[SYS] CARBO-ROLLED STEEL FRAMES MOUNTED IN CNC MILLS",
+                      "[SYS] THERMO-FUSED LAB FINISH FORMULA APPLIED"
+                    ] : activeOrderTrackData?.status === 'TRANSIT' ? [
+                      "[OK] FABRICATION STAGE CONCLUDED SUCCESSFULLY",
+                      `[SYS] SAT GPS TRACKER COUPLED: POSITIVE LOCK`,
+                      `[SYS] TRUCK TELEMETRY: VELOCITY=74KM/H, HEADING=142°SE`,
+                      `[INFO] SHIPMENT EN ROUTE: RADAR COVERAGE IN PROGRESS (${activeOrderTrackData?.transitProgress || 0}%)`
+                    ] : activeOrderTrackData?.status === 'INSTALLED' ? [
+                      "[OK] SHIPMENT MOUNTED ON HYDRAULIC DISPATCH SHIPPER",
+                      "[OK] CARGO POSITION REACHED CLIENT BOUNDARY SITE",
+                      "[SYS] FLOOR ANCHOR BOLTS EXPANDED AT 120NM SPEC",
+                      "[SUCCESS] INSTALL COMPLETED. PROWL CONTRACT DEPLOYED."
+                    ] : [
+                      "[SYS] AWAITING CAD VERIFICATION AUDIT BY PROWL STRUCTURAL TEAM"
+                    ])
+                  ].map((log, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-[#ffe08f]/55">[{new Date().toLocaleTimeString('en-US', {hour12: false})}]</span>
+                      <span>{log}</span>
+                    </div>
+                  ))}
+                  <div className="text-gold/40 animate-pulse blink-cursor">• CONNECTED STREAM LOG TAPPING...</div>
+                </div>
+
+              </div>
+
+              {/* RIGHT COLUMN: Diagnostic Stats and Simulations */}
+              <div className="md:col-span-5 flex flex-col gap-5">
+                
+                {/* TELEMETRY READOUTS */}
+                <div className="p-4 border border-[#222] bg-[#0c0d0c] rounded">
+                  <span className="font-mono text-[8.5px] text-muted uppercase tracking-widest block mb-3">
+                    [ SAT-GPS DYNAMIC TELEMETRY ]
+                  </span>
+                  <div className="grid grid-cols-2 gap-3.5 font-mono text-[10px]">
+                    <div className="bg-black/40 border border-[#1a1a1a] p-2.5 rounded">
+                      <span className="text-muted block text-[8px] uppercase">Transit Velocity</span>
+                      <span className="text-white font-bold text-sm block mt-0.5 font-sans">
+                        {activeOrderTrackData?.status === 'TRANSIT' ? `${activeOrderTrackData?.speed || 74} km/h` : '0 km/h'}
+                      </span>
+                    </div>
+                    <div className="bg-black/40 border border-[#1a1a1a] p-2.5 rounded">
+                      <span className="text-muted block text-[8px] uppercase">Calibrated Distance</span>
+                      <span className="text-white font-bold text-sm block mt-0.5">
+                        {activeOrderTrackData?.status === 'INSTALLED' ? 'Delivered' : 
+                         activeOrderTrackData?.status === 'TRANSIT' ? `${activeOrderTrackData?.distanceRemaining || 120} km left` :
+                         'Docked'}
+                      </span>
+                    </div>
+                    <div className="bg-black/40 border border-[#1a1a1a] p-2.5 rounded">
+                      <span className="text-muted block text-[8px] uppercase">Latitude Coordinate</span>
+                      <span className="text-[#ffe08f] font-bold text-xs block mt-0.5 select-all">
+                        {activeOrderTrackData?.latitude ? activeOrderTrackData.latitude.toFixed(5) : '18.97500'}
+                      </span>
+                    </div>
+                    <div className="bg-black/40 border border-[#1a1a1a] p-2.5 rounded">
+                      <span className="text-muted block text-[8px] uppercase">Longitude Coordinate</span>
+                      <span className="text-[#ffe08f] font-bold text-xs block mt-0.5 select-all">
+                        {activeOrderTrackData?.longitude ? activeOrderTrackData.longitude.toFixed(5) : '72.82580'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ACCELERATOR SIMULATOR CONTROLLER PANEL */}
+                <div className="p-4 border border-[#c9a84c]/20 bg-[#141513] rounded">
+                  <div className="flex items-center gap-1.5 text-gold mb-1">
+                    <Flame className="w-3.5 h-3.5 text-gold" style={{ strokeWidth: 2.5 }} />
+                    <span className="font-mono text-[9px] uppercase tracking-widest font-bold">
+                      COGNITIVE DEMO STAGE SIMULATOR
+                    </span>
+                  </div>
+                  <p className="font-sans text-[10px] text-[#acacac] leading-relaxed mb-3">
+                    Fast-forward the delivery timeline on our full-stack Express database. Each click advances physical fabrication or speeds up the delivery vehicle!
+                  </p>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!quoteNumber) return;
+                      setIsSimulatingState(true);
+                      try {
+                        const r = await fetch(`/api/orders/${quoteNumber}/simulate`, {
+                          method: "POST"
+                        });
+                        if (r.ok) {
+                          const updated = await r.json();
+                          setActiveOrderTrackData(updated.order);
+                        }
+                      } catch (err) {
+                        console.error("Simulation trigger failed:", err);
+                      } finally {
+                        setIsSimulatingState(false);
+                      }
+                    }}
+                    disabled={isSimulatingState || activeOrderTrackData?.status === "INSTALLED"}
+                    className="w-full h-10 bg-gold hover:bg-[#ffe08f] disabled:opacity-50 disabled:cursor-not-allowed text-black font-mono text-[10px] font-bold uppercase transition-all tracking-wider flex items-center justify-center gap-2 cursor-pointer rounded"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSimulatingState ? 'animate-spin' : ''}`} />
+                    {activeOrderTrackData?.status === "INSTALLED" ? "DELIVERY CONCLUDED" : 
+                     isSimulatingState ? "SIMULATING DISPATCH SPEED-RUN..." : "ADVANCE DISPATCH STAGE"}
+                  </button>
+                </div>
+
+                {/* PAST ORDERS SELECTOR GRID */}
+                {ordersHistory.length > 1 && (
+                  <div className="flex flex-col gap-1.5 text-left">
+                    <span className="font-mono text-[8px] text-muted uppercase tracking-widest">
+                      [ SWITCH CONTRACT CHANNELS ]
+                    </span>
+                    <div className="flex flex-col gap-1.5 max-h-[90px] overflow-y-auto pr-1">
+                      {ordersHistory.filter(id => id !== quoteNumber).map((id) => (
+                        <button
+                          key={id}
+                          onClick={async () => {
+                            try {
+                              const r = await fetch(`/api/orders/${id}`);
+                              if (r.ok) {
+                                const data = await r.json();
+                                setActiveOrderTrackData(data);
+                                setQuoteNumber(id);
+                              }
+                            } catch (_) {}
+                          }}
+                          className="w-full p-2 bg-black border border-[#222] hover:border-gold/30 text-left flex justify-between items-center rounded cursor-pointer transition-all"
+                        >
+                          <span className="font-mono text-[8px] text-[#acacac]">{id}</span>
+                          <ChevronRight className="w-3 h-3 text-gold/50" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* CLOSE ACTIONS */}
+                <button
+                  onClick={() => {
+                    setIsCheckoutCompleted(false);
+                    setShowConfigModal(false);
+                    onClose();
+                    onClearOrder();
+                  }}
+                  className="w-full h-11 border border-white/10 hover:border-white/30 text-white font-mono text-[10px] tracking-widest uppercase flex items-center justify-center cursor-pointer transition-all duration-300 rounded"
+                >
+                  DISMISS LOGISTICS CONTROL TERMINAL
+                </button>
+
+              </div>
+
             </div>
-            <div className="w-full bg-[#1c1c1e] p-3 font-mono text-[10px] text-left border border-white/[0.05] rounded">
-              <div className="text-gold font-bold uppercase mb-1 border-b border-white/[0.05] pb-1">ORDER DISPATCH MEMO</div>
-              <div>• Setup Code ID: {quoteNumber || "PRW-AUTO-LOCK"}</div>
-              <div>• Total Val: ₹{animatedTotal.toLocaleString('en-IN')}</div>
-              <div>• Assembly: {whiteGloveService ? 'Prowl White Glove' : 'Standard Self Setup'}</div>
-            </div>
-            <button
-              onClick={() => {
-                setIsCheckoutCompleted(false);
-                setShowConfigModal(false);
-                onClose();
-                onClearOrder();
-              }}
-              className="w-full h-11 bg-gold hover:bg-[#ffe08f] text-black font-sans text-xs tracking-widest font-semibold uppercase flex items-center justify-center cursor-pointer transition-all duration-300"
-            >
-              FINISH SESSION
-            </button>
+
           </div>
         </div>
       )}
